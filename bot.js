@@ -60,10 +60,7 @@ client.on('message', message => {
 
     message.member.voiceChannel.join().then(connection => {
       const file = voice[Math.floor(Math.random() * voice.length)];
-      const dispatcher = connection.playFile(file);
-      dispatcher.on('end', () => {
-        connection.disconnect();
-      });
+      player.playFile(file, connection, message.guild.id);
     });
   }
 });
@@ -128,14 +125,10 @@ client.on('message', message => {
     volumeReq = parseInt(message.content.substr(5));
 
     if (volumeReq >= 0 && volumeReq <= 100) {
-
       message.react("👍");
       player.adjustVolume(volumeReq, message.guild.id);
-
-    } else {
-
+    }else{
       message.react("👎");
-
     }
 
   } else if (message.content === "/join") {

@@ -1,5 +1,6 @@
 const config = require('./config');
 const ytdl = require('ytdl-core');
+var dispatcher = {};
 queue = {};
 module.exports = {
 
@@ -21,22 +22,28 @@ module.exports = {
         if (vc = module.exports.client.voiceConnections.get(guildID)) {
             if (dis = vc.dispatcher)
                 dis.end(1);
+            else if(dispatcher[guildID])
+                dispatcher[guildID].end(1);
             vc.disconnect();
         }
     },
 
     skipSong: function (guildID) {
         if (vc = module.exports.client.voiceConnections.get(guildID)) {
-            if (dis = vc.dispatcher) {
+            if (dis = vc.dispatcher){ 
                 dis.end(2);
+            }else if (dispatcher[guildID]){
+                dispatcher[guildID].end();
             }
         }
     },
 
     adjustVolume: function (vol, guildID) {
-        if (vc = module.exports.client.voiceConnections.get(guildID)) {
-            vc.dispatcher.setVolumeLogarithmic(vol / 100);
-        }
+        if (vc = module.exports.client.voiceConnections.get(guildID))
+            if(dis = vc.dispatcher)
+                dis.setVolumeLogarithmic(vol / 100);
+            else if (dispatcher[guildID])
+                dispatcher[guildID].setVolumeLogarithmic(vol / 100);
     },
 
     addToQueue: function (url, guildID) {
@@ -49,11 +56,11 @@ module.exports = {
         const stream = ytdl(queue[guildID][0], {
             filter: 'audioonly'
         });
-        const dispatcher = connection.playStream(stream, {
+        dispatcher[guildID] = connection.playStream(stream, {
             volume: 0.4
         });
 
-        dispatcher.on('end', (reason) => {
+        dispatcher[guildID].on('end', (reason) => {
             if (reason != 2)
                 queue[guildID].shift();
 
@@ -67,10 +74,10 @@ module.exports = {
 
     },
 
-    playFile: function (fileName, connection) {
+    playFile: function (file, connection, guildID) {
 
-        const dispatcher = connection.playFile(config.installLocation + fileName);
-        dispatcher.on('end', () => {
+        dispatcher[guildID] = connection.playFile(file);
+        dispatcher[guildID].on('end', () => {
             connection.disconnect();
         });
 
