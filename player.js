@@ -4,7 +4,11 @@ queue = {};
 module.exports = {
 
     client : {},
-
+    inGuild : function(guildID){
+        if(module.exports.client.voiceConnections.get(guildID))
+            return true;
+        return false;
+    },
     queue : function(guildID){
         return queue[guildID];
     },

@@ -49,12 +49,12 @@ playlists = {};
 
 
 
-//Voice
+//Voices
 client.on('message', message => {
+  
   if (!message.guild)
     return;
   if (voice = voices[message.content.substr(1)]) {
-    //console.log(voice);
     if (player.inGuild(message.guild.id) || !message.member.voiceChannel)
       return;
 
@@ -68,60 +68,15 @@ client.on('message', message => {
   }
 });
 
+//Admin Commands
 client.on('message', message => {
-
-  if (!(message.content === "/reloadVoices"))
-    return;
-  getVoices();
-});
-
-//Queue and Curr
-client.on('message', message => {
-  if (!message.guild)
-    return;
-  if (message.content === "/playing") {
-    if (q = player.queue(message.guild.id))
-      if (q.length > 0)
-        message.reply(q[0]);
-    return;
+  if(message.author.id != config.admin)
+    return
+  switch(message.content){
+    case "/reloadVoices":
+      getVoices();
+      break
   }
-  if (message.content === "/list" || message.content === "/queue") {
-    if (q = player.queue(message.guild.id))
-      if (q.length > 0) {
-        var queueStr = "Queue (" + q.length + "):\n";
-
-        for (var i = 1; i <= q.length; i++) {
-          queueStr += i + ") <" + q[i - 1] + ">\n";
-        }
-        message.reply(queueStr);
-      }
-  }
-});
-
-//Stop
-client.on('message', message => {
-  if (!message.guild)
-    return;
-
-  if (message.content === "/stop") {
-    player.stopPlaying(message.guild.id);
-    return;
-  }
-
-  if (message.content === "/clear") {
-    player.stopPlaying(message.guild.id);
-    player.clearQueue(message.guild.id);
-    return;
-  }
-});
-
-//Skip
-client.on('message', message => {
-  if (!message.guild)
-    return;
-
-  if (message.content === "/skip")
-    player.skipSong(message.guild.id);
 });
 
 
@@ -134,25 +89,6 @@ client.on('message', message => {
   message.reply(tsundres[Math.floor(Math.random() * tsundres.length)]);
 });
 
-//Set Volume
-client.on('message', message => {
-  if (!message.guild)
-    return;
-
-  if (!(message.content.substr(0, 5) === "/vol "))
-    return;
-
-  volumeReq = -1;
-  if (message.content.length == 7)
-    volumeReq = parseInt(message.content.substr(-2, 2));
-  else if (message.content.length == 8)
-    volumeReq = parseInt(message.content.substr(-3, 3));
-
-  if (volumeReq >= 0 && volumeReq <= 100)
-    player.adjustVolume(volumeReq, message.guild.id);
-
-
-});
 
 //Help
 client.on('message', message => {
@@ -168,34 +104,63 @@ client.on('message', message => {
 
 });
 
-//Play
+//Guild required commands (skip, stop, clear, join, play, vol, list, playing)
 client.on('message', message => {
-  if (!(message.guild && message.member.voiceChannel)) {
-    message.reply("Join a channel").then(message => logReply(message, messageID));
+  if (!message.guild)
     return;
-  }
 
-  if (message.content === "/join") {
-    if (player.inGuild(message.guild.id)) {
+  if (message.content === "/stop") {
+
+    player.stopPlaying(message.guild.id);
+
+  } else if (message.content === "/skip") {
+
+    message.react("👍");
+    player.skipSong(message.guild.id);
+
+  } else if (message.content === "/clear") {
+
+    player.stopPlaying(message.guild.id);
+    player.clearQueue(message.guild.id);
+
+  } else if (message.content.substr(0, 5) === "/vol ") {
+
+    volumeReq = parseInt(message.content.substr(5));
+
+    if (volumeReq >= 0 && volumeReq <= 100) {
+
+      message.react("👍");
+      player.adjustVolume(volumeReq, message.guild.id);
+
+    } else {
+
+      message.react("👎");
+
+    }
+
+  } else if (message.content === "/join") {
+
+    if (player.inGuild(message.guild.id))
       player.stopPlaying(message.guild.id);
-    }
-    if (q = player.queue(message.guild.id)) {
-      if (q.length > 0) {
+
+    if (q = player.queue(message.guild.id))
+      if (q.length > 0)
         message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
-      }
-    }
 
-  }
-
-  if (message.content.substr(0, 6) === "/play ") {
+  } else if (message.content.substr(0, 6) === "/play ") {
 
     vidUrl = message.content.substr(6);
 
     if (ytdl.validateLink(vidUrl)) {
+
       message.react("👍");
+
       if (player.inGuild(message.guild.id)) {
+
         player.addToQueue(vidUrl, message.guild.id);
+
       } else {
+
         player.addToQueue(vidUrl, message.guild.id);
         message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
       }
@@ -203,6 +168,20 @@ client.on('message', message => {
     } else {
       message.react("👎");
     }
+  } else if (message.content === "/list" || message.content === "/queue") {
+    if (q = player.queue(message.guild.id))
+      if (q.length > 0) {
+        var queueStr = "Queue (" + q.length + "):\n";
+
+        for (var i = 1; i <= q.length; i++) {
+          queueStr += i + ") <" + q[i - 1] + ">\n";
+        }
+        message.reply(queueStr);
+      }
+  } else if (message.content === "/playing") {
+    if (q = player.queue(message.guild.id))
+      if (q.length > 0)
+        message.reply(q[0]);
   }
 
 

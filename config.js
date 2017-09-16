@@ -1,4 +1,5 @@
 module.exports = {
     installLocation :   '',
-    apikey:             ''
+    apikey:             '',
+    admin:              ''
 }
