@@ -1,0 +1,216 @@
+const Discord = require('discord.js');
+const ytdl = require('ytdl-core');
+const fs = require('fs');
+const client = new Discord.Client();
+const config = require('./config');
+const player = require('./player');
+player.client = client;
+const replies = {};
+const queue = {};
+const voices = {};
+const tsundres = ["https://cdn.awwni.me/tk2h.jpg",
+  "https://imgur.com/Poi4gkr",
+  "http://pm1.narvii.com/6094/3c1978f57a011af3d9a2069901ce2e86160dd696_hq.jpg",
+  "https://68.media.tumblr.com/c5c260dcb303f9c2414485a69f057fcb/tumblr_nzk87vmJ1c1uz8vb5o1_500.gif",
+  "https://i.pinimg.com/originals/84/a6/4d/84a64d010b04aa2a8d80484b81b71e98.jpg"
+];
+
+getVoices();
+
+function getVoices() {
+  fs.readdirSync(config.installLocation + 'Audio/Voices/').forEach(file => {
+    voices[file] = [];
+    var voiceDir = config.installLocation + 'Audio/Voices/' + file + '/';
+    var voice = file;
+    fs.readdirSync(voiceDir).forEach(file => {
+      voices[voice].push(voiceDir + file);
+    });
+  });
+}
+
+const commands = ["/help - Shows this menu.",
+  "/vol [0-100] - Sets volume",
+  "/stop - Remove bot from channel and keep queue (minus currently playing).",
+  "/play [youtubeLink] - Plays requested link, or adds link to queue.",
+  "/join - Join your voice channel and start queue.",
+  "/[queue|list] - Prints the current playlist.",
+  "/skip - Skips current song.",
+  "/clear - Stops bot, clears playlist",
+  "/playing - Prints playing song",
+  "/tsundere - For your daily dose of tsundere",
+  "Default Volume is 40%"
+];
+
+client.on('ready', () => {
+  console.log('I am ready!');
+});
+
+playlists = {};
+
+
+
+//Voice
+client.on('message', message => {
+  if (!message.guild)
+    return;
+  if (voice = voices[message.content.substr(1)]) {
+    //console.log(voice);
+    if (player.inGuild(message.guild.id) || !message.member.voiceChannel)
+      return;
+
+    message.member.voiceChannel.join().then(connection => {
+      const file = voice[Math.floor(Math.random() * voice.length)];
+      const dispatcher = connection.playFile(file);
+      dispatcher.on('end', () => {
+        connection.disconnect();
+      });
+    });
+  }
+});
+
+client.on('message', message => {
+
+  if (!(message.content === "/reloadVoices"))
+    return;
+  getVoices();
+});
+
+//Queue and Curr
+client.on('message', message => {
+  if (!message.guild)
+    return;
+  if (message.content === "/playing") {
+    if (q = player.queue(message.guild.id))
+      if (q.length > 0)
+        message.reply(q[0]);
+    return;
+  }
+  if (message.content === "/list" || message.content === "/queue") {
+    if (q = player.queue(message.guild.id))
+      if (q.length > 0) {
+        var queueStr = "Queue (" + q.length + "):\n";
+
+        for (var i = 1; i <= q.length; i++) {
+          queueStr += i + ") <" + q[i - 1] + ">\n";
+        }
+        message.reply(queueStr);
+      }
+  }
+});
+
+//Stop
+client.on('message', message => {
+  if (!message.guild)
+    return;
+
+  if (message.content === "/stop") {
+    player.stopPlaying(message.guild.id);
+    return;
+  }
+
+  if (message.content === "/clear") {
+    player.stopPlaying(message.guild.id);
+    player.clearQueue(message.guild.id);
+    return;
+  }
+});
+
+//Skip
+client.on('message', message => {
+  if (!message.guild)
+    return;
+
+  if (message.content === "/skip")
+    player.skipSong(message.guild.id);
+});
+
+
+//Tsundere
+client.on('message', message => {
+  if (!(message.content === "/tsundere"))
+    return;
+
+  var messageID = message.id;
+  message.reply(tsundres[Math.floor(Math.random() * tsundres.length)]);
+});
+
+//Set Volume
+client.on('message', message => {
+  if (!message.guild)
+    return;
+
+  if (!(message.content.substr(0, 5) === "/vol "))
+    return;
+
+  volumeReq = -1;
+  if (message.content.length == 7)
+    volumeReq = parseInt(message.content.substr(-2, 2));
+  else if (message.content.length == 8)
+    volumeReq = parseInt(message.content.substr(-3, 3));
+
+  if (volumeReq >= 0 && volumeReq <= 100)
+    player.adjustVolume(volumeReq, message.guild.id);
+
+
+});
+
+//Help
+client.on('message', message => {
+  if (!(message.content === "/help"))
+    return;
+
+  replyStr = "Available Commands:\n";
+
+  for (var i = 0; i < commands.length; i++)
+    replyStr += commands[i] + '\n';
+
+  message.reply(replyStr)
+
+});
+
+//Play
+client.on('message', message => {
+  if (!(message.guild && message.member.voiceChannel)) {
+    message.reply("Join a channel").then(message => logReply(message, messageID));
+    return;
+  }
+
+  if (message.content === "/join") {
+    if (player.inGuild(message.guild.id)) {
+      player.stopPlaying(message.guild.id);
+    }
+    if (q = player.queue(message.guild.id)) {
+      if (q.length > 0) {
+        message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
+      }
+    }
+
+  }
+
+  if (message.content.substr(0, 6) === "/play ") {
+
+    vidUrl = message.content.substr(6);
+
+    if (ytdl.validateLink(vidUrl)) {
+      message.react("👍");
+      if (player.inGuild(message.guild.id)) {
+        player.addToQueue(vidUrl, message.guild.id);
+      } else {
+        player.addToQueue(vidUrl, message.guild.id);
+        message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
+      }
+
+    } else {
+      message.react("👎");
+    }
+  }
+
+
+});
+
+client.on('messageDelete', message => {
+  if (message.id in replies)
+    replies[message.id].delete();
+});
+
+client.login(config.apikey);
