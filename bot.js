@@ -8,6 +8,7 @@ player.client = client;
 const replies = {};
 const queue = {};
 const voices = {};
+var voiceStr = "";
 const tsundres = ["https://cdn.awwni.me/tk2h.jpg",
   "https://imgur.com/Poi4gkr",
   "http://pm1.narvii.com/6094/3c1978f57a011af3d9a2069901ce2e86160dd696_hq.jpg",
@@ -18,27 +19,35 @@ const tsundres = ["https://cdn.awwni.me/tk2h.jpg",
 getVoices();
 
 function getVoices() {
+  voiceStr = "Voices: ";
   fs.readdirSync(config.installLocation + 'Audio/Voices/').forEach(file => {
-    voices[file] = [];
+
+    var voice = file.toLowerCase();
+    voices[voice] = [];
+    voiceStr += file + ", ";
     var voiceDir = config.installLocation + 'Audio/Voices/' + file + '/';
-    var voice = file;
+
     fs.readdirSync(voiceDir).forEach(file => {
       voices[voice].push(voiceDir + file);
     });
   });
+  voiceStr = voiceStr.slice(0,-2) + ".";
 }
 
-const commands = ["/help - Shows this menu.",
-  "/vol [0-100] - Sets volume",
-  "/stop - Remove bot from channel and keep queue (minus currently playing).",
-  "/play [youtubeLink] - Plays requested link, or adds link to queue.",
-  "/join - Join your voice channel and start queue.",
-  "/[queue|list] - Prints the current playlist.",
-  "/skip - Skips current song.",
-  "/clear - Stops bot, clears playlist",
-  "/playing - Prints playing song",
-  "/tsundere - For your daily dose of tsundere",
-  "Default Volume is 40%"
+const commands = ["**/help** - Shows this menu.",
+  "**/vol** [0-100] - Sets volume",
+  "**/stop** - Remove bot from channel and keep queue (minus currently playing).",
+  "**/play** [youtubeLink] - Plays requested link, or adds link to queue.",
+  "**/join** - Join your voice channel and start queue.",
+  "**/[queue|list]** - Prints the current playlist.",
+  "**/skip** - Skips current song.",
+  "**/clear** - Stops bot, clears playlist",
+  "**/playing** - Prints playing song",
+  "**/[voice]** - Plays specified voice",
+  "**/voices** - List voices",
+  "**/tsundere** - For your daily dose of tsundere",
+  "**---NOTES---**",
+  "Queue multiple tracks by seperating them with a newline (Shift+Enter)"
 ];
 
 client.on('ready', () => {
@@ -51,10 +60,10 @@ playlists = {};
 
 //Voices
 client.on('message', message => {
-  
+
   if (!message.guild)
     return;
-  if (voice = voices[message.content.substr(1)]) {
+  if (voice = voices[message.content.substr(1).toLowerCase()]) {
     if (player.inGuild(message.guild.id) || !message.member.voiceChannel)
       return;
 
@@ -67,11 +76,12 @@ client.on('message', message => {
 
 //Admin Commands
 client.on('message', message => {
-  if(message.author.id != config.admin)
+  if (message.author.id != config.admin)
     return
-  switch(message.content){
+  switch (message.content) {
     case "/reloadVoices":
       getVoices();
+      message.react("👍");
       break
   }
 });
@@ -86,13 +96,12 @@ client.on('message', message => {
   message.reply(tsundres[Math.floor(Math.random() * tsundres.length)]);
 });
 
-
 //Help
 client.on('message', message => {
   if (!(message.content === "/help"))
     return;
 
-  replyStr = "Available Commands:\n";
+  replyStr = "**---Available Commands---**\n";
 
   for (var i = 0; i < commands.length; i++)
     replyStr += commands[i] + '\n';
@@ -106,62 +115,80 @@ client.on('message', message => {
   if (!message.guild)
     return;
 
-  if (message.content === "/stop") {
+  if (message.member.voiceChannel) {
+    if (message.content === "/stop") {
 
-    player.stopPlaying(message.guild.id);
-
-  } else if (message.content === "/skip") {
-
-    message.react("👍");
-    player.skipSong(message.guild.id);
-
-  } else if (message.content === "/clear") {
-
-    player.stopPlaying(message.guild.id);
-    player.clearQueue(message.guild.id);
-
-  } else if (message.content.substr(0, 5) === "/vol ") {
-
-    volumeReq = parseInt(message.content.substr(5));
-
-    if (volumeReq >= 0 && volumeReq <= 100) {
-      message.react("👍");
-      player.adjustVolume(volumeReq, message.guild.id);
-    }else{
-      message.react("👎");
-    }
-
-  } else if (message.content === "/join") {
-
-    if (player.inGuild(message.guild.id))
       player.stopPlaying(message.guild.id);
 
-    if (q = player.queue(message.guild.id))
-      if (q.length > 0)
-        message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
+    } else if (message.content.substr(0,5) === "/skip") {
 
-  } else if (message.content.substr(0, 6) === "/play ") {
-
-    vidUrl = message.content.substr(6);
-
-    if (ytdl.validateLink(vidUrl)) {
-
-      message.react("👍");
-
-      if (player.inGuild(message.guild.id)) {
-
-        player.addToQueue(vidUrl, message.guild.id);
-
-      } else {
-
-        player.addToQueue(vidUrl, message.guild.id);
-        message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
+      
+      trackToSkip = parseInt(message.content.substr(6));
+      if((isNaN(trackToSkip) && message.content.length == 5)|| trackToSkip == 1){
+        message.react("👍");
+        player.skipSong(message.guild.id);
+      }else{
+        if(!isNaN(trackToSkip) && player.skipSongById(message.guild.id, (trackToSkip-1)))
+            message.react("👍");
+          else
+            message.react("👎");
       }
 
-    } else {
-      message.react("👎");
+    } else if (message.content === "/clear") {
+
+      player.stopPlaying(message.guild.id);
+      player.clearQueue(message.guild.id);
+
+    } else if (message.content.substr(0, 5) === "/vol ") {
+
+      volumeReq = parseInt(message.content.substr(5));
+
+      if (volumeReq >= 0 && volumeReq <= 100) {
+        message.react("👍");
+        player.adjustVolume(volumeReq, message.guild.id);
+      } else {
+        message.react("👎");
+      }
+
+    } else if (message.content === "/join") {
+
+      if (player.inGuild(message.guild.id))
+        player.stopPlaying(message.guild.id);
+
+      if (q = player.queue(message.guild.id))
+        if (q.length > 0)
+          message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
+
+    } else if (message.content.substr(0, 6) === "/play ") {
+
+
+      vidUrl = message.content.substr(6);
+      vidUrl = vidUrl.split(/\n/);
+      for(var i = 0; i < vidUrl.length; i++){
+        if(ytdl.validateLink(vidUrl[i]))
+          i++;
+        else
+          vidUrl.splice(i, 1);
+      }
+
+      if (vidUrl.length > 0) {
+
+        message.react("👍");
+
+        for(var i = 0; i < vidUrl.length; i++)
+            player.addToQueue(vidUrl[i], message.guild.id);
+
+        if (!player.inGuild(message.guild.id)) 
+          message.member.voiceChannel.join().then(connection => player.playMusic(connection, message.guild.id));
+
+      } else {
+        message.react("👎");
+      }
+
     }
-  } else if (message.content === "/list" || message.content === "/queue") {
+  }
+
+  if (message.content === "/list" || message.content === "/queue") {
     if (q = player.queue(message.guild.id))
       if (q.length > 0) {
         var queueStr = "Queue (" + q.length + "):\n";
@@ -175,7 +202,10 @@ client.on('message', message => {
     if (q = player.queue(message.guild.id))
       if (q.length > 0)
         message.reply(q[0]);
+  }else if (message.content === "/voices"){
+      message.reply(voiceStr);
   }
+
 
 
 });
