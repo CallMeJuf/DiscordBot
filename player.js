@@ -1,4 +1,12 @@
-const config = require('./config'); const ytdl = require('ytdl-core'); var dispatcher = {}; queue = {}; 
+const config = require('./config');  const youtubedl = require('youtube-dl'); var dispatcher = {}; queue = {}; volume = {};
+
+const disOptions = {
+    volume: 1.0,
+    bitrate: 320000
+};
+function setVolume(vol, guildID){
+	volume[guildID] = (vol * 0.005);
+}
 module.exports = {
     client : {},
     inGuild : function(guildID){
@@ -24,7 +32,7 @@ module.exports = {
     skipSong: function (guildID) {
         if (vc = module.exports.client.voiceConnections.get(guildID)) {
             if (dis = vc.dispatcher){
-                dis.end(2);
+                dis.end();
             }else if (dispatcher[guildID]){
                 dispatcher[guildID].end();
             }
@@ -38,37 +46,75 @@ module.exports = {
     },
     adjustVolume: function (vol, guildID) {
         if (vc = module.exports.client.voiceConnections.get(guildID))
+            setVolume(vol, guildID)
             if(dis = vc.dispatcher)
-                dis.setVolumeLogarithmic(vol / 100);
+                dis.setVolumeLogarithmic(volume[guildID]);
             else if (dispatcher[guildID])
-                dispatcher[guildID].setVolumeLogarithmic(vol / 100);
+                dispatcher[guildID].setVolumeLogarithmic(volume[guildID]);
     },
-    addToQueue: function (url, guildID) {
+    getVolume: function (guildID) {
+        return volume[guildID] ? (volume[guildID] * 200) : false ;
+    },
+    addToQueue: function (url, guildID, urlInfo) {
         if (!queue[guildID])
             queue[guildID] = [];
-        queue[guildID].push(url);
+        
+        queue[guildID].push({url:url, info:urlInfo});
     },
-    playMusic: function (connection, guildID) {
-        const stream = ytdl(queue[guildID][0], {
-            filter: 'audioonly'
-        });
-        dispatcher[guildID] = connection.playStream(stream, {
-            volume: 0.4
-        });
+    playUniversal: function (connection, guildID) {
+        
+        if(!volume[guildID])
+            setVolume(100, guildID)
+
+        dispatcher[guildID] = connection.playArbitraryInput(queue[guildID][0].url , disOptions);
+        dispatcher[guildID].setVolumeLogarithmic(volume[guildID])
+
+         
+        dispatcher[guildID].setVolumeLogarithmic(volume[guildID])
+
         dispatcher[guildID].on('end', (reason) => {
             if (reason != 2)
                 queue[guildID].shift();
             if (queue[guildID].length === 0 || reason === 1) {
                 connection.disconnect();
             } else {
-                module.exports.playMusic(connection, guildID);
+                module.exports.playUniversal(connection, guildID);
             }
         });
     },
     playFile: function (file, connection, guildID) {
-        dispatcher[guildID] = connection.playFile(file);
+        if(!volume[guildID])
+            setVolume(100, guildID)
+
+        dispatcher[guildID] = connection.playFile(file, disOptions);
+
+        dispatcher[guildID].setVolumeLogarithmic(volume[guildID])
+
         dispatcher[guildID].on('end', () => {
             connection.disconnect();
         });
-    }
+    },
+    playAlbum: function (files, connection, guildID) {
+        if(!volume[guildID])
+            setVolume(100, guildID)
+
+        dispatcher[guildID] = connection.playFile(files.pop(), disOptions);
+
+        dispatcher[guildID].setVolumeLogarithmic(volume[guildID])
+
+        dispatcher[guildID].on('end', (reason) => {
+
+            if (files.length === 0 || reason === 1) {
+                connection.disconnect();
+            } else {
+                module.exports.playAlbum(files, connection, guildID);
+            }
+
+        });
+    },
+    playNext: function (url, guildID, urlInfo) {
+        if (!queue[guildID])
+            queue[guildID] = [];
+        queue[guildID].splice(1, 0, {url:url, info:urlInfo});
+    },
 }
