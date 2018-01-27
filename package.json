@@ -1,0 +1,32 @@
+{
+  "name": "discordbot",
+  "version": "0.5.0",
+  "description": "Node Discord Bot that handle multiple servers.",
+  "main": "bot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CallMeJuf/DiscordBot.git"
+  },
+  "author": "Juf",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/CallMeJuf/DiscordBot/issues"
+  },
+  "homepage": "https://github.com/CallMeJuf/DiscordBot#readme",
+  "dependencies": {
+    "bufferutil": "^3.0.3",
+    "discord.js": "^11.3.0",
+    "download-file": "^0.1.5",
+    "erlpack": "github:discordapp/erlpack",
+    "libsodium-wrappers": "^0.7.3",
+    "node-opus": "^0.2.7",
+    "opusscript": "0.0.6",
+    "sodium": "^2.0.3",
+    "uws": "^9.14.0",
+    "valid-url": "^1.0.9",
+    "youtube-dl": "^1.12.2"
+  }
+}
