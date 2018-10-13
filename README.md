@@ -22,8 +22,15 @@ Preceded with a '/', Case-Inensitive. To queue multiple songs at once, use a pla
 | **Clear**\* | Clears playlist and removes bot from channel |
 | **Voices** | Lists voices | 
 | **[voice]**\* | Plays specified voice |
+| **follow [twitchUser]**\*\* | Display a message in the channel when the streamer goes live. |
 
 \* Must be in a voice channel.
+
+\*\* Must be in twitchAdmin array.
+
+### Example Twitch Notification:
+
+![Twitch Notification](https://i.imgur.com/0Pn7Blb.png)
 
 ## Notes
 

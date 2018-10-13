@@ -371,8 +371,6 @@ function playVoice(message) {
 client.on('ready', () => {
   console.log("Getting Voices...")
   getVoices();
-  console.log("Seeding Twitch Watcher")
-  seedTwitch();
   console.log('I am ready!');
 });
 
@@ -485,7 +483,6 @@ client.on('messageDelete', message => {
   if (message.id in replies)
     replies[message.id].delete();
 });
-
 
 // TwitchWatcher
 
