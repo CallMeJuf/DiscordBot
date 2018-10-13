@@ -164,7 +164,7 @@ class Twitch extends EventEmitter {
         });
     }
 
-    subscribeById(user_id, username = '', unsub = false) {
+    subscribeById(user_id, username, unsub = false) {
         console.log((unsub ? "Unsubbing" : "Subbing ") + " UserID: " + username + " | " + user_id)
         var body = JSON.stringify({
             "hub.callback": 'http://' + this.callback_url + ":" + this.port + '/' + username,
