@@ -1,5 +1,9 @@
 module.exports = {
     installLocation :   '',
     apikey:             '',
-    admin:              ''
+    admin:              '',
+    twitchApiKey:       '',
+    serverIP:           '',
+    serverPort:         '',
+    callbackURL:        '' 
 }

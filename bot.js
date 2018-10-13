@@ -5,6 +5,8 @@ const config = require('./config');
 const player = require('./player');
 const download = require('download-file');
 const validUrl = require('valid-url');
+const Twitch = require('./twitch')
+const twitchHandler = new Twitch(config.twitchApiKey, config.serverIP, config.serverPort, config.callbackURL);
 const client = new Discord.Client();
 player.client = client;
 const replies = {};
@@ -12,6 +14,7 @@ const queue = {};
 const voices = {};
 const albums = {};
 const formats = [".ogg", ".mp3", ".m4a"]
+const twitchAdmins = [config.admin, "89162127771717632"]
 const voiceMappings = {
   "89172578026942464": "Jer",
   "126198941543825408": "Mati",
@@ -213,6 +216,54 @@ const commands = {
 
   voices: function (message) {
     message.reply(voiceStr);
+  },
+  follow: function (message){
+    var username = message.content.split(' ')[1];
+    if(twitchAdmins.indexOf(message.author.id) == -1 || username.match(/[^0-9a-zA-Z]/) || username.length == 0){
+      message.react("👎")
+      return
+    }
+    if(message.content.split(' ').length == 3 && client.channels.get(message.content.split(' ')[2])){
+      twitchHandler.subscribeByName(username, message.content.split(' ')[2])
+    }
+    else if (message.content.split(' ').length == 2){
+      twitchHandler.subscribeByName(username, message.channel.id)
+    }else{
+      message.react("👎")
+      return
+    }
+
+    message.react("👍")
+     
+  },
+  unfollow: function(message){
+    var username = message.content.substr(10);
+    if(twitchAdmins.indexOf(message.author.id) == -1 || username.match(/[^0-9a-zA-Z]/) || username.length == 0){
+      message.react("👎")
+      return
+    }
+
+    twitchHandler.unsubscribeByName(username)
+    message.react("👍")
+
+  },
+  following: function(message){
+    if(twitchAdmins.indexOf(message.author.id) == -1){
+      message.react("👎")
+      return
+    }
+    
+    var reply = "";
+    var twitchFollow = twitchHandler.getSubscriptionsByChannel(message.channel.id);
+    for(var sub in twitchFollow){
+      reply = reply + "**" + (parseInt(sub) + 1) + ")**  " + twitchFollow[sub] + "\n"
+    }
+    if(reply == ""){
+      message.reply("Not following anyone.")
+    }else{
+      message.reply("**Following**\n" + reply)
+    }
+
   }
 }
 
@@ -320,6 +371,8 @@ function playVoice(message) {
 client.on('ready', () => {
   console.log("Getting Voices...")
   getVoices();
+  console.log("Seeding Twitch Watcher")
+  seedTwitch();
   console.log('I am ready!');
 });
 
@@ -329,11 +382,44 @@ client.on('message', message => {
   if (message.author.id != config.admin)
     return
 
-  switch (message.content) {
-    case "/reloadVoices":
+  switch (message.content.split(' ')[0].toLowerCase()) {
+    case "/reloadvoices":
       getVoices();
       message.react("👍");
       break
+    case "/twitchallow":
+      if(typeof message.content.split(' ')[1] == 'undefined'){
+        message.react("👍")
+        message.reply(twitchAdmins)
+      }else{
+        if(message.content.split(' ')[1].match(/[^0-9]/) == null){
+          twitchAdmins.push(message.content.split(' ')[1])
+          message.react("👍");
+        }else{
+          message.react("👎")
+        }
+      }
+      break
+    case "/twitchseed":
+      seedTwitch()
+      message.react("👎")
+      break
+    case "/twitchfollowing":
+      var reply = "";
+      var twitchFollow = twitchHandler.getSubscriptions();
+      for(var sub in twitchFollow){
+        reply = reply + "**" + (parseInt(sub) + 1) + ")**  " + twitchFollow[sub] + "\n"
+      }
+      if(reply == ""){
+        message.reply("Not following anyone.")
+      }else{
+        message.reply("**Following**\n" + reply)
+      }
+      break
+    case "/admincommands":
+      message.reply("reloadVoices\ntwitchAllow\ntwitchSeed\ntwitchFollowing")
+    break
+
   }
 
 
@@ -361,6 +447,7 @@ client.on('message', message => {
           message.react("👎");
         } else {
           message.react("👍");
+          getVoices();
         }
       });
 
@@ -399,4 +486,38 @@ client.on('messageDelete', message => {
     replies[message.id].delete();
 });
 
+
+// TwitchWatcher
+
+twitchHandler.on('online', ({name, channelID, image, title, started_at, logo}) =>{
+  var discordChannel = client.channels.get(channelID);
+  if (typeof discordChannel == 'undefined')
+    return
+
+    var embed = new Discord.RichEmbed({
+      'footer': {
+        'text': 'Started Streaming'
+      },
+      'title': name + ' is Streaming!',
+      'thumbnail': {
+        'url': (logo ? logo : "https://i.imgur.com/Hu00P2G.png")
+      },
+      'url': 'https://twitch.tv/' + name,
+      'timestamp': new Date(started_at),
+      'fields': [{
+        'name': 'Stream Title',
+        'value': (title ? title : "*None*")
+      }]
+    });
+
+  if(image)
+    embed.setImage(image);
+  
+  console.log("[Twitch] Online - " + name + " at " + started_at)
+  discordChannel.send(embed)
+})
+
+twitchHandler.on('message', (data) => {
+  console.log(data)
+})
 client.login(config.apikey);
