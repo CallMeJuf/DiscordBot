@@ -486,7 +486,7 @@ client.on('messageDelete', message => {
 
 // TwitchWatcher
 
-twitchHandler.on('online', ({name, channelID, image, title, started_at, logo}) =>{
+twitchHandler.on('online', ({name, channelID, image, title, started_at, logo, game}) =>{
   var discordChannel = client.channels.get(channelID);
   if (typeof discordChannel == 'undefined')
     return
@@ -502,8 +502,8 @@ twitchHandler.on('online', ({name, channelID, image, title, started_at, logo}) =
       'url': 'https://twitch.tv/' + name,
       'timestamp': new Date(started_at),
       'fields': [{
-        'name': 'Stream Title',
-        'value': (title ? title : "*None*")
+        'name': (title ? title : "*None*"),
+        'value': 'Playing ' + (game ? game : " Unknown")
       }]
     });
 

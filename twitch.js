@@ -20,6 +20,7 @@ channelID   : Discord ID
 image       : Thumbnail image URL
 title       : Stream title
 started_at  : String date (2018-07-26T09:05:24Z)
+game        : Name of game playing
 */
 class Twitch extends EventEmitter {
 
@@ -69,15 +70,34 @@ class Twitch extends EventEmitter {
                         this.emit('offline', sub);
                     } else {
                         if (sub['lastID'] != jsonData['data'][0]['id']) {
+
                             this.subscribed[name]['lastID'] = jsonData['data'][0]['id'];
-                            this.emit('online', {
-                                "name": sub['name'],
-                                "channelID": sub['channelID'],
-                                "image": jsonData['data'][0]['thumbnail_url'].replace('{height}', '720').replace('{width}', '1280') + '?' + Date.now(),
-                                "title": jsonData['data'][0]['title'],
-                                "started_at": jsonData['data'][0]['started_at'],
-                                "logo": sub['logo'] + '?' + Date.now()
+                            this.getGameByID(jsonData['data'][0]['game_id']).then( (game) => {
+                                this.emit('online', {
+                                    "name"      : sub['name'],
+                                    "channelID" : sub['channelID'],
+                                    "image"     : jsonData['data'][0]['thumbnail_url'].replace('{height}', '720').replace('{width}', '1280') + '?' + Date.now(),
+                                    "title"     : jsonData['data'][0]['title'],
+                                    "started_at": jsonData['data'][0]['started_at'],
+                                    "logo"      : sub['logo'] + '?' + Date.now(),
+                                    "game"      : game['data'].length ? game['data'][0]['name'] : false
+                                });
+
+                            }).catch( (err) => {
+                                console.log("Couldn't get game, error: ");
+                                console.log(err);
+                                
+                                this.emit('online', {
+                                    "name"      : sub['name'],
+                                    "channelID" : sub['channelID'],
+                                    "image"     : jsonData['data'][0]['thumbnail_url'].replace('{height}', '720').replace('{width}', '1280') + '?' + Date.now(),
+                                    "title"     : jsonData['data'][0]['title'],
+                                    "started_at": jsonData['data'][0]['started_at'],
+                                    "logo"      : sub['logo'] + '?' + Date.now(),
+                                    "game"      : false
+                                });
                             });
+
                         }
                     }
                 }
@@ -233,6 +253,37 @@ class Twitch extends EventEmitter {
             delete this.subscribed[username.toLowerCase()]
 
         }
+    }
+
+    getGameByID(gameID){
+        let cID = this.client_id;
+        return new Promise(function(resolve, reject){
+            var reqOpts = {
+                hostname: "api.twitch.tv",
+                port: 443,
+                path: "/helix/games?id=" + gameID,
+                method: "GET",
+                headers: {
+                    "Accept": "application/vnd.twitchtv.v5+json",
+                    "Client-ID": cID
+                }
+            }
+
+            https.get(reqOpts, (res) => {
+                var data = ''
+                res.on('data', (d) => {
+                    data += d;
+                });
+                res.on('end', () => {
+                    var jsonData = JSON.parse(data);
+                    resolve(jsonData);
+
+                })
+
+            }).on('error', (e) => {
+                reject(e);
+            });
+        });
     }
 }
 
