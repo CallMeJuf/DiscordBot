@@ -34,6 +34,7 @@ const commandList = ["**/help** - Shows this menu.",
   "**/playing** - Prints playing song",
   "**/[voice]** - Plays specified voice",
   "**/voices** - List voices",
+  "**/spoiler** - Creates a hoverable link for spoilers",
   "**---NOTES---**",
   "Queue multiple tracks by seperating them with a newline (Shift+Enter)"
 ];
@@ -264,6 +265,21 @@ const commands = {
       message.reply("**Following**\n" + reply)
     }
 
+  },
+  spoiler: function(message){
+    if ( message.deletable ){
+      message.delete().then( (msg) => {
+        let spoiler = msg.content.slice(9);
+        if( spoiler.length > 0 ){
+          let embed = new Discord.RichEmbed({
+            'description' : `[Spoiler: Hover to View](https://dummyimage.com/800x200/fff/000&text=${ encodeURIComponent(spoiler) } "${ spoiler }")`
+          });
+          msg.reply(embed);
+        }
+      });
+    } else {
+      message.reply("I need 'Manage Messages' permission to properly create spoilers.");
+    }
   }
 }
 
