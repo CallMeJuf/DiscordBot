@@ -9,6 +9,7 @@ Preceded with a '/', Case-Inensitive. To queue multiple songs at once, use a pla
 | Command | Description |
 | --- | --- |
 | **Help** | Prints this list. |
+| **Spoiler**\ | Creates hoverable link with spoiler text. | 
 | **Vol**\* | Replys with the current volume. |
 | **Vol** [0-100]\* | Set bot's volume in user's channel. |
 | **Stop**\* | Remove bot from channel and retain queue (minus now playing) | 
@@ -19,7 +20,6 @@ Preceded with a '/', Case-Inensitive. To queue multiple songs at once, use a pla
 | **List**\* | Same as 'Queue' |
 | **Playing**\* | Prints current song |
 | **Skip**\* | Skips current song. | 
-| **Spoiler**\* | Creates hoverable link with spoiler text. | 
 | **Clear**\* | Clears playlist and removes bot from channel |
 | **Voices** | Lists voices | 
 | **[voice]**\* | Plays specified voice |
