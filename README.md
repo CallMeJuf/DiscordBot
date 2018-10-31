@@ -19,6 +19,7 @@ Preceded with a '/', Case-Inensitive. To queue multiple songs at once, use a pla
 | **List**\* | Same as 'Queue' |
 | **Playing**\* | Prints current song |
 | **Skip**\* | Skips current song. | 
+| **Spoiler**\* | Creates hoverable link with spoiler text. | 
 | **Clear**\* | Clears playlist and removes bot from channel |
 | **Voices** | Lists voices | 
 | **[voice]**\* | Plays specified voice |
