@@ -16,9 +16,10 @@ const albums = {};
 const formats = [".ogg", ".mp3", ".m4a"]
 const twitchAdmins = [config.admin, "89162127771717632"]
 const voiceMappings = {
-  "89172578026942464": "Jer",
+  "89172578026942464" : "Jer",
   "126198941543825408": "Mati",
-  "234853451056676864": "Juf"
+  "234853451056676864": "Juf",
+  "89162127771717632" : "Wyze"
 };
 const ytdlOptions = ['--playlist-end', '1', '--format=bestaudio/best', '--restrict-filenames'];
 var voiceStr = "";
@@ -430,8 +431,28 @@ client.on('message', message => {
         message.reply("**Following**\n" + reply)
       }
       break
+    case "/uploadallow":
+      let msg_arr = message.content.split(' ');
+      let mapping = "default";
+      if (msg_arr.length == 3)
+        mapping = msg_arr[2];
+      if (msg_arr.length > 1){
+        message.react("👍");
+        voiceMappings[msg_arr[1]] = mapping;
+      }
+        
+    break
+    case "/twitchallowed":
+      message.reply(JSON.stringify(twitchAdmins));
+      message.react("👍");
+    break
+    case "/uploadallowed":
+      message.reply(JSON.stringify(voiceMappings));
+      message.react("👍");
+    break
     case "/admincommands":
-      message.reply("reloadVoices\ntwitchAllow\ntwitchSeed\ntwitchFollowing")
+      message.reply("reloadVoices\ntwitchAllow\ntwitchSeed\ntwitchFollowing\nuploadAllow\ntwitchAllowed\nuploadAllowed");
+      message.react("👍");
     break
 
   }
@@ -443,29 +464,44 @@ client.on('message', message => {
 client.on('message', message => {
   if (message.channel.type != "dm")
     return
-
+  
   if (!voiceMappings[message.author.id])
     return
+
+  let voice_command = voiceMappings[message.author.id];
+  if ( message.content ){
+    let temp_command =  message.content.trim().replace(' ','_').replace(/[^a-zA-Z0-9_\-]/gi, '');
+    if(reserved_commands.includes(temp_command.toLowerCase())){
+      message.reply(`${temp_command} is a reserved command, try another name.`);
+      return
+    } else {
+      voice_command = temp_command;
+    } 
+  }
   console.log(message.attachments);
-  if (message.attachments)
+  if (message.attachments){
     message.attachments.forEach(file => {
       if (formats.indexOf(file.filename.substr(-4).toLowerCase()) == -1)
         return
-
+      let path = config.installLocation + "Audio/Voices/" + voice_command + "/"
+      if (!fs.existsSync(path)){
+        fs.mkdirSync(path);
+      }
       download(file.url, {
-        directory: config.installLocation + "Audio/Voices/" + voiceMappings[message.author.id] + "/",
+        directory: path,
         filename: file.filename
       }, function (err) {
         if (err) {
           console.log(err);
           message.react("👎");
         } else {
+          message.reply(`File "${file.filename}" added to command "/${voice_command}"`)
           message.react("👍");
           getVoices();
         }
       });
-
     });
+  }
 
 });
 
