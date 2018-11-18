@@ -474,12 +474,12 @@ client.on('message', message => {
     let temp_command =  message.content.trim().replace(' ','_').replace(/[^a-zA-Z0-9_\-]/gi, '');
     if(reserved_commands.includes(temp_command.toLowerCase())){
       message.reply(`${temp_command} is a reserved command, try another name.`);
+      message.react("👎");
       return
     } else {
       voice_command = temp_command;
     } 
   }
-  console.log(message.attachments);
   if (message.attachments){
     message.attachments.forEach(file => {
       if (formats.indexOf(file.filename.substr(-4).toLowerCase()) == -1)
@@ -488,19 +488,25 @@ client.on('message', message => {
       if (!fs.existsSync(path)){
         fs.mkdirSync(path);
       }
-      download(file.url, {
-        directory: path,
-        filename: file.filename
-      }, function (err) {
-        if (err) {
-          console.log(err);
-          message.react("👎");
-        } else {
-          message.reply(`File "${file.filename}" added to command "/${voice_command}"`)
-          message.react("👍");
-          getVoices();
-        }
-      });
+      if ( fs.existsSync(path + file.filename) ) {
+        message.reply(`That command has a file called "${file.filename}" already, please rename the file and try again.`);
+        message.react("👎");
+      } else {
+        download(file.url, {
+          directory: path,
+          filename: file.filename
+        }, function (err) {
+          if (err) {
+            console.log(err);
+            message.react("👎");
+          } else {
+            message.reply(`File "${file.filename}" added to command "/${voice_command}"`)
+            message.react("👍");
+            getVoices();
+          }
+        });
+      }
+
     });
   }
 
