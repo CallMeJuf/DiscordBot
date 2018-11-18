@@ -15,6 +15,7 @@ const voices = {};
 const albums = {};
 const formats = [".ogg", ".mp3", ".m4a"]
 const twitchAdmins = [config.admin, "89162127771717632"]
+const reserved_commands = ['help','vol','stop','playnext','play','join', 'queue', 'list', 'skip', 'clear', 'playing', 'voices', 'follow', 'unfollow', 'following', 'spoiler', 'reloadvoices', 'twitchallow', 'twitchseed', 'twitchfollowing', 'admincommands'];
 const voiceMappings = {
   "89172578026942464" : "Jer",
   "126198941543825408": "Mati",
