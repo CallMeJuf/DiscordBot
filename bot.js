@@ -95,7 +95,7 @@ const commands = {
     str = str + 'Requestor id:' +  message.author.id + '\n';
     str = str + 'Requestor name:' + message.author.username + '\n';
     for (var i = 0; i < vidUrl.length; i++)
-      str = str + 'Request URL: <' + vidUrl[i] + '>\n'
+      str = str + 'Request URL: ' + vidUrl[i] + '\n'
     str = str + "----------------------------\n";
     log(str, message.guild.id);
 
@@ -118,7 +118,7 @@ const commands = {
     str = str + 'Requestor id:' +  message.author.id + '\n';
     str = str + 'Requestor name:' + message.author.username + '\n';
     for (var i = 0; i < vidUrl.length; i++)
-      str = str + 'Request URL: <' + vidUrl[i] + '>\n'
+      str = str + 'Request URL: ' + vidUrl[i] + '\n'
 
     addNext(vidUrl, message.guild.id, message.author, message.author.voiceChannel, message);
 
