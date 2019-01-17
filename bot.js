@@ -10,18 +10,17 @@ const twitchHandler = new Twitch(config.twitchApiKey, config.serverIP, config.se
 const client = new Discord.Client();
 player.client = client;
 const replies = {};
-const queue = {};
 const voices = {};
-const albums = {};
 const formats = [".ogg", ".mp3", ".m4a"]
 const twitchAdmins = [config.admin, "89162127771717632"]
 const reserved_commands = ['help','vol','stop','playnext','play','join', 'queue', 'list', 'skip', 'clear', 'playing', 'voices', 'follow', 'unfollow', 'following', 'spoiler', 'reloadvoices', 'twitchallow', 'twitchseed', 'twitchfollowing', 'admincommands'];
 const voiceMappings = {
-  "89172578026942464" : "Jer",
+  "89172578026942464": "Jer",
   "126198941543825408": "Mati",
   "234853451056676864": "Juf",
-  "89162127771717632" : "Wyze"
+  "89162127771717632": "Wyze"
 };
+let loggingChannels = {};
 const ytdlOptions = ['--playlist-end', '1', '--format=bestaudio/best', '--restrict-filenames'];
 var voiceStr = "";
 const commandList = ["**/help** - Shows this menu.",
@@ -31,7 +30,7 @@ const commandList = ["**/help** - Shows this menu.",
   "**/playnext** [link] - Plays requested links next.",
   "**/join** - Join your voice channel and start queue.",
   "**/[queue|list]** - Prints the current playlist.",
-  "**/skip** - Skips current song.",
+  "**/skip** [n] - Skips current (or #n in queue) song.",
   "**/clear** - Stops bot, clears playlist",
   "**/playing** - Prints playing song",
   "**/[voice]** - Plays specified voice",
@@ -92,17 +91,19 @@ const commands = {
     vidUrl = message.content.substr(6);
     vidUrl = vidUrl.split(/\n/);
 
-    console.log("--------SONG REQUEST---------");
-    console.log('Requestor id:', message.author.id);
-    console.log('Requestor name:', message.author.username);
+    let str = "--------SONG REQUEST---------\n";
+    str = str + 'Requestor id:' +  message.author.id + '\n';
+    str = str + 'Requestor name:' + message.author.username + '\n';
     for (var i = 0; i < vidUrl.length; i++)
-      console.log('Request URL: ', vidUrl[i])
+      str = str + 'Request URL: <' + vidUrl[i] + '>\n'
+    str = str + "----------------------------\n";
+    log(str, message.guild.id);
 
     addURLs(vidUrl, message.guild.id, message.author, message.member.voiceChannel, message)
 
 
 
-    console.log("----------------------------\n");
+    
 
   },
 
@@ -113,11 +114,11 @@ const commands = {
     vidUrl = message.content.substr(10);
     vidUrl = vidUrl.split(/\n/);
 
-    console.log("--------SONG REQUEST---------");
-    console.log('Requestor id:', message.author.id);
-    console.log('Requestor name:', message.author.username);
+    let str = "--------SONG REQUEST---------\n";
+    str = str + 'Requestor id:' +  message.author.id + '\n';
+    str = str + 'Requestor name:' + message.author.username + '\n';
     for (var i = 0; i < vidUrl.length; i++)
-      console.log('Request URL: ', vidUrl[i])
+      str = str + 'Request URL: <' + vidUrl[i] + '>\n'
 
     addNext(vidUrl, message.guild.id, message.author, message.author.voiceChannel, message);
 
@@ -285,6 +286,7 @@ const commands = {
   }
 }
 
+
 function getVoices() {
   voiceStr = "Voices: ";
   fs.readdirSync(config.installLocation + 'Audio/Voices/').forEach(file => {
@@ -317,10 +319,11 @@ function addURLs(urls, guildID, requestor, voiceChannel, message, first = true) 
         info = [info]
 
       for (i = 0; i < info.length; i++) {
-        console.log('--------ADDING TO QUEUE----------');
-        console.log('title:', info[i].title);
-        console.log('filename:', info[i]._filename);
-        console.log('------', requestor.username, '---', requestor.id, '------\n');
+        let str = '--------ADDING TO QUEUE----------\n';
+        str = str + 'title:' + info[i].title + '\n';
+        str = str + 'filename:' + info[i]._filename + '\n';
+        str = str + '------' + requestor.username + '---' + requestor.id + '------\n'
+        log(str, message.guild.id);
         if (message)
           message.react("👍");
         player.addToQueue(info[i].url, guildID, info[i]);
@@ -352,10 +355,11 @@ function addNext(urls, guildID, requestor, voiceChannel, message) {
         console.log(err)
         return
       }
-      console.log('--------ADDING TO QUEUE----------');
-      console.log('title:', info.title);
-      console.log('filename:', info._filename);
-      console.log('------', requestor.username, '---', requestor.id, '------\n');
+      let str = '--------ADDING TO QUEUE----------\n';
+      str = str + 'title:' + info.title + '\n';
+      str = str + 'filename:' + info._filename + '\n';
+      str = str + '------' + requestor.username + '---' + requestor.id + '------\n'
+      log(str, message.guild.id);
       if (message)
         message.react("👍");
       player.playNext(info.url, guildID, info);
@@ -376,11 +380,24 @@ function addNext(urls, guildID, requestor, voiceChannel, message) {
 function playVoice(message) {
   if (player.inGuild(message.guild.id) || !message.member.voiceChannel)
     return;
-  voice = voices[message.content.substr(1).split(" ", 1)[0].toLowerCase()];
+  let name = message.content.substr(1).split(" ", 1)[0].toLowerCase();
+  voice = voices[name];
 
   message.member.voiceChannel.join().then(connection => {
     const file = voice[Math.floor(Math.random() * voice.length)];
+    let str = "--------PLAY VOICE---------\n";
+    str = str + 'Requestor id:' +  message.author.id + '\n';
+    str = str + 'Requestor name:' + message.author.username + '\n';
+    str = str + 'Requested Voice:' + name + '\n';
+    str = str + 'Filename:' + file + '\n';
+    str = str + '-------------------------\n';
+    log(str, message.guild.id);
     player.playFile(file, connection, message.guild.id);
+    if ( message.deletable ) {
+        message.delete();
+    } else {
+        message.react("👍");
+    }
   });
 }
 
@@ -438,22 +455,31 @@ client.on('message', message => {
       if (msg_arr.length == 3)
         mapping = msg_arr[2];
       if (msg_arr.length > 1){
-        message.react("👍");
         voiceMappings[msg_arr[1]] = mapping;
+        message.react("👍")
       }
-        
     break
     case "/twitchallowed":
       message.reply(JSON.stringify(twitchAdmins));
-      message.react("👍");
+      message.react("👍")
     break
     case "/uploadallowed":
       message.reply(JSON.stringify(voiceMappings));
-      message.react("👍");
+      message.react("👍")
+    break
+    case "/say":
+      message.reply(message.content.slice(5));
+      message.react("👍")
+      break
+    case "/setlogchannel":
+      loggingChannels[message.guild.id] = message.channel.id
+      message.react("👍")
+    case "/getlogchannel":
+      message.reply(loggingChannels[message.guild.id])
+      message.react("👍")
     break
     case "/admincommands":
-      message.reply("reloadVoices\ntwitchAllow\ntwitchSeed\ntwitchFollowing\nuploadAllow\ntwitchAllowed\nuploadAllowed");
-      message.react("👍");
+      message.reply("reloadVoices\ntwitchAllow\ntwitchSeed\ntwitchFollowing\nsay\nuploadallow\nuploadallowed\ntwtichallowed\ngetlogchannel\nsetlogchannel");
     break
 
   }
@@ -501,6 +527,7 @@ client.on('message', message => {
             message.react("👎");
           } else {
             message.reply(`File "${file.filename}" added to command "/${voice_command}"`)
+            console.log(`File "${file.filename}" added to command "/${voice_command}", by "${message.author.id}":"${message.author.username}"`)
             message.react("👍");
             getVoices();
           }
@@ -566,9 +593,9 @@ twitchHandler.on('online', ({name, channelID, image, title, started_at, logo, ga
       }]
     });
 
-  if(image)
-    embed.setImage(image);
-  
+  if(image){
+     embed.setImage(image);
+  }
   console.log("[Twitch] Online - " + name + " at " + started_at)
   discordChannel.send(embed)
 })
@@ -577,3 +604,15 @@ twitchHandler.on('message', (data) => {
   console.log(data)
 })
 client.login(config.apikey);
+
+function log( msg, guild ){
+  let n = new Date();
+  let output = `[${n.getFullYear()}-${n.getMonth()}-${n.getDate()}_${n.getHours()}:${n.getMinutes()}:${n.getSeconds()}] : ${msg}`;
+  console.log(output);
+  if ( guild && loggingChannels[guild] ){
+    output = "```\n" + output + "```\n";
+    var discordChannel = client.channels.get(loggingChannels[guild]);
+    discordChannel.send(output);
+  }
+
+}
