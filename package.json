@@ -1,32 +1,114 @@
 {
-  "name": "discordbot",
-  "version": "0.5.0",
-  "description": "Node Discord Bot that handle multiple servers.",
+  "name": "discordbotrefactor",
+  "version": "0.0.1",
+  "description": "Refactor of FreeReignBot",
   "main": "bot.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/CallMeJuf/DiscordBot.git"
+  "author": "",
+  "license": "ISC",
+  "eslintConfig": {
+    "rules": {
+      "semi": [
+        2,
+        "always"
+      ],
+      "comma-dangle": [
+        2,
+        "never"
+      ],
+      "no-dupe-args": 2,
+      "no-empty": 2,
+      "no-extra-parens": [
+        2,
+        "functions"
+      ],
+      "no-empty-character-class": 2,
+      "no-invalid-regexp": 2,
+      "no-unreachable": 2,
+      "valid-jsdoc": 2,
+      "curly": 2,
+      "no-inner-declarations": 2,
+      "no-cond-assign": 2,
+      "array-bracket-spacing": [
+        2,
+        "never"
+      ],
+      "block-spacing": [
+        2,
+        "always"
+      ],
+      "comma-spacing": [
+        2,
+        {
+          "before": false,
+          "after": true
+        }
+      ],
+      "keyword-spacing": 2,
+      "no-duplicate-case": 2,
+      "no-debugger": 2,
+      "no-constant-condition": 2,
+      "valid-typeof": 2,
+      "no-alert": 2,
+      "yoda": 2,
+      "no-multiple-empty-lines": [
+        2,
+        {
+          "max": 2,
+          "maxBOF": 0,
+          "maxEOF": 1
+        }
+      ],
+      "semi-spacing": 2,
+      "object-curly-spacing": [
+        2,
+        "always"
+      ],
+      "space-infix-ops": 2,
+      "key-spacing": [
+        2,
+        {
+          "singleLine": {
+            "beforeColon": false,
+            "afterColon": true
+          },
+          "multiLine": {
+            "beforeColon": true,
+            "afterColon": true,
+            "align": "colon"
+          }
+        }
+      ],
+      "no-multi-str": "error",
+      "new-parens": "error",
+      "no-new-object": "error"
+    },
+    "env": {
+      "es6": true,
+      "node": true
+    },
+    "parserOptions": {
+      "ecmaVersion": 2017
+    }
   },
-  "author": "Juf",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/CallMeJuf/DiscordBot/issues"
+  "devDependencies": {
+    "eslint": "^5.15.3",
+    "gulp": "^4.0.0",
+    "gulp-eslint": "^5.0.0",
+    "gulp-mocha": "^6.0.0",
+    "gulp-util": "^3.0.8",
+    "mocha": "^6.2.0"
   },
-  "homepage": "https://github.com/CallMeJuf/DiscordBot#readme",
   "dependencies": {
-    "bufferutil": "^3.0.3",
-    "discord.js": "^11.3.0",
-    "download-file": "^0.1.5",
-    "erlpack": "github:discordapp/erlpack",
-    "libsodium-wrappers": "^0.7.3",
-    "node-opus": "^0.2.7",
-    "opusscript": "0.0.6",
-    "sodium": "^2.0.3",
-    "uws": "^9.14.0",
-    "valid-url": "^1.0.9",
-    "youtube-dl": "^1.12.2"
+    "bluebird": "^3.5.3",
+    "discord.js": "github:discordjs/discord.js",
+    "mongodb": "^3.2.2",
+    "node-opus": "^0.3.2",
+    "opusscript": "0.0.7",
+    "sodium": "^3.0.2",
+    "youtube-dl": "^2.0.1",
+    "zucc": "^0.1.2"
   }
 }

@@ -1,618 +1,152 @@
-const Discord = require('discord.js');
-const youtubedl = require('youtube-dl');
-const fs = require('fs');
-const config = require('./config');
-const player = require('./player');
-const download = require('download-file');
-const validUrl = require('valid-url');
-const Twitch = require('./twitch')
-const twitchHandler = new Twitch(config.twitchApiKey, config.serverIP, config.serverPort, config.callbackURL);
-const client = new Discord.Client();
-player.client = client;
-const replies = {};
-const voices = {};
-const formats = [".ogg", ".mp3", ".m4a"]
-const twitchAdmins = [config.admin, "89162127771717632"]
-const reserved_commands = ['help','vol','stop','playnext','play','join', 'queue', 'list', 'skip', 'clear', 'playing', 'voices', 'follow', 'unfollow', 'following', 'spoiler', 'reloadvoices', 'twitchallow', 'twitchseed', 'twitchfollowing', 'admincommands'];
-const voiceMappings = {
-  "89172578026942464": "Jer",
-  "126198941543825408": "Mati",
-  "234853451056676864": "Juf",
-  "89162127771717632": "Wyze"
+const Promise      = require('bluebird');
+const FS           = require('fs');
+const Config       = require('./config');
+const Discord      = require('./discord.js');
+const MongoDB      = require('mongodb');
+Promise.promisifyAll(MongoDB);
+const MongoClient     = MongoDB.MongoClient;
+const Collection      = MongoDB.Collection;
+const MONGO_URL       = "mongodb://localhost:27017/discord";
+const MONGO_DB        = 'discord';
+const MONGO_LOG_COL   = 'botlogs';
+const MongoConnection = MongoClient.connect(MONGO_URL, { useNewUrlParser: true });
+
+const Client       = Discord.Client;
+const Plugins      = {};
+const command_list = {
+    [Discord.CONSTS.MESSAGE] : {}
 };
-let loggingChannels = {};
-const ytdlOptions = ['--playlist-end', '1', '--format=bestaudio/best', '--restrict-filenames'];
-var voiceStr = "";
-const commandList = ["**/help** - Shows this menu.",
-  "**/vol** [0-100] - Sets volume, /vol to get volume.",
-  "**/stop** - Remove bot from channel and keep queue (minus currently playing).",
-  "**/play** [link] - Plays requested link, or adds link to queue.",
-  "**/playnext** [link] - Plays requested links next.",
-  "**/join** - Join your voice channel and start queue.",
-  "**/[queue|list]** - Prints the current playlist.",
-  "**/skip** [n] - Skips current (or #n in queue) song.",
-  "**/clear** - Stops bot, clears playlist",
-  "**/playing** - Prints playing song",
-  "**/[voice]** - Plays specified voice",
-  "**/voices** - List voices",
-  "**/spoiler** - Creates a hoverable link for spoilers",
-  "**---NOTES---**",
-  "Queue multiple tracks by seperating them with a newline (Shift+Enter)"
-];
 
-const commands = {
+const PLUGIN_DIR   = `./plugins/`;
 
-  help: function (message) {
-
-    replyStr = "**---Available Commands---**\n";
-
-    for (var i = 0; i < commandList.length; i++)
-      replyStr += commandList[i] + '\n';
-
-    message.reply(replyStr)
-
-  },
-
-  vol: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    if (message.content === "/vol") {
-      curVolume = player.getVolume(message.guild.id);
-      if (curVolume) {
-        message.reply("Volume is " + curVolume.toString() + "% ");
-      }
-    } else {
-
-      volumeReq = parseInt(message.content.substr(5));
-
-      if (volumeReq >= 0 && volumeReq <= 100) {
-        message.react("👍");
-        player.adjustVolume(volumeReq, message.guild.id);
-      } else {
-        message.react("👎");
-      }
-
-    }
-
-
-  },
-
-  stop: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-    player.stopPlaying(message.guild.id);
-  },
-
-  play: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    vidUrl = message.content.substr(6);
-    vidUrl = vidUrl.split(/\n/);
-
-    let str = "--------SONG REQUEST---------\n";
-    str = str + 'Requestor id:' +  message.author.id + '\n';
-    str = str + 'Requestor name:' + message.author.username + '\n';
-    for (var i = 0; i < vidUrl.length; i++)
-      str = str + 'Request URL: ' + vidUrl[i] + '\n'
-    str = str + "----------------------------\n";
-    log(str, message.guild.id);
-
-    addURLs(vidUrl, message.guild.id, message.author, message.member.voiceChannel, message)
-
-
-
-    
-
-  },
-
-  playnext: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    vidUrl = message.content.substr(10);
-    vidUrl = vidUrl.split(/\n/);
-
-    let str = "--------SONG REQUEST---------\n";
-    str = str + 'Requestor id:' +  message.author.id + '\n';
-    str = str + 'Requestor name:' + message.author.username + '\n';
-    for (var i = 0; i < vidUrl.length; i++)
-      str = str + 'Request URL: ' + vidUrl[i] + '\n'
-
-    addNext(vidUrl, message.guild.id, message.author, message.author.voiceChannel, message);
-
-    console.log("----------------------------\n");
-
-  },
-
-  join: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    if (player.inGuild(message.guild.id)) {
-      player.stopPlaying(message.guild.id);
-    }
-
-    if (q = player.queue(message.guild.id)) {
-      if (q.length > 0) {
-        message.member.voiceChannel.join().then(connection => player.playUniversal(connection, message.guild.id));
-      }
-    }
-  },
-
-  queue: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    if (q = player.queue(message.guild.id)) {
-      if (q.length > 0) {
-        var queueStr = "**Queue (" + q.length + "):**\n";
-
-        for (var i = 1; i <= q.length; i++) {
-          tmpInfo = q[i - 1].info
-          queueStr += i + ") **" + tmpInfo.title + "** *" + tmpInfo.extractor_key + " | " + tmpInfo.duration + "*\n";
-        }
-
-        replyArr = queueStr.match(/(.|[\r\n]){1,1900}/g);
-        console.log(replyArr);
-        for (i = 0; i < replyArr.length; i++) {
-          message.reply(replyArr[i]);
-        }
-      }
-    }
-  },
-
-  list: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    if (q = player.queue(message.guild.id)) {
-      if (q.length > 0) {
-        var queueStr = "**Queue (" + q.length + "):**\n";
-
-        for (var i = 1; i <= q.length; i++) {
-          tmpInfo = q[i - 1].info
-          queueStr += i + ") **" + tmpInfo.title + "** *" + tmpInfo.extractor_key + " | " + tmpInfo.duration + "*\n";
-        }
-
-        replyArr = queueStr.match(/(.|[\r\n]){1,1900}/g);
-        console.log(replyArr);
-        for (i = 0; i < replyArr.length; i++) {
-          message.reply(replyArr[i]);
-        }
-      }
-    }
-  },
-
-  skip: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    trackToSkip = parseInt(message.content.substr(6));
-    if ((isNaN(trackToSkip) && message.content.length == 5) || trackToSkip == 1) {
-      message.react("👍");
-      player.skipSong(message.guild.id);
-    } else {
-      if (player.skipSongById(message.guild.id, (trackToSkip - 1)))
-        message.react("👍");
-      else
-        message.react("👎");
-    }
-
-  },
-
-  clear: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-    player.stopPlaying(message.guild.id);
-    player.clearQueue(message.guild.id);
-  },
-
-  playing: function (message) {
-    if (!message.guild || !message.member.voiceChannel)
-      return;
-
-    if (q = player.queue(message.guild.id))
-      if (q.length > 0)
-        message.reply("**" + q[0].info.title + "** *" + q[0].info.extractor_key + " | " + q[0].info.duration + "<" + q[0].info.webpage_url + ">*");
-  },
-
-  voices: function (message) {
-    message.reply(voiceStr);
-  },
-  follow: function (message){
-    var username = message.content.split(' ')[1];
-    if(twitchAdmins.indexOf(message.author.id) == -1 || username.match(/[^0-9a-zA-Z]/) || username.length == 0){
-      message.react("👎")
-      return
-    }
-    if(message.content.split(' ').length == 3 && client.channels.get(message.content.split(' ')[2])){
-      twitchHandler.subscribeByName(username, message.content.split(' ')[2])
-    }
-    else if (message.content.split(' ').length == 2){
-      twitchHandler.subscribeByName(username, message.channel.id)
-    }else{
-      message.react("👎")
-      return
-    }
-
-    message.react("👍")
-     
-  },
-  unfollow: function(message){
-    var username = message.content.substr(10);
-    if(twitchAdmins.indexOf(message.author.id) == -1 || username.match(/[^0-9a-zA-Z]/) || username.length == 0){
-      message.react("👎")
-      return
-    }
-
-    twitchHandler.unsubscribeByName(username)
-    message.react("👍")
-
-  },
-  following: function(message){
-    if(twitchAdmins.indexOf(message.author.id) == -1){
-      message.react("👎")
-      return
-    }
-    
-    var reply = "";
-    var twitchFollow = twitchHandler.getSubscriptionsByChannel(message.channel.id);
-    for(var sub in twitchFollow){
-      reply = reply + "**" + (parseInt(sub) + 1) + ")**  " + twitchFollow[sub] + "\n"
-    }
-    if(reply == ""){
-      message.reply("Not following anyone.")
-    }else{
-      message.reply("**Following**\n" + reply)
-    }
-
-  },
-  spoiler: function(message){
-    if ( message.deletable ){
-      message.delete().then( (msg) => {
-        let spoiler = msg.content.slice(9);
-        if( spoiler.length > 0 ){
-          let embed = new Discord.RichEmbed({
-            'description' : `[Spoiler: Hover to View](https://dummyimage.com/800x200/fff/000&text=${ encodeURIComponent(spoiler) } "${ spoiler }")`
-          });
-          msg.reply(embed);
-        }
-      });
-    } else {
-      message.reply("I need 'Manage Messages' permission to properly create spoilers.");
-    }
-  }
+function init() {
+    populatePlugins();
+    populateCommands();
 }
 
-
-function getVoices() {
-  voiceStr = "Voices: ";
-  fs.readdirSync(config.installLocation + 'Audio/Voices/').forEach(file => {
-
-    var voice = file.toLowerCase();
-    voices[voice] = [];
-    voiceStr += file + ", ";
-    var voiceDir = config.installLocation + 'Audio/Voices/' + file + '/';
-
-    fs.readdirSync(voiceDir).forEach(file => {
-      voices[voice].push(voiceDir + file);
-    });
-  });
-  voiceStr = voiceStr.slice(0, -2) + ".";
-}
-
-function addURLs(urls, guildID, requestor, voiceChannel, message, first = true) {
-  url = urls.shift();
-  if (validUrl.isUri(url)) {
-    youtubedl.getInfo(url, ytdlOptions, {
-      maxBuffer: 1024 * 1000
-    }, function (err, info) {
-      if (err) {
-        if (message)
-          message.react("😠");
-        console.log(err)
-        return
-      }
-      if (info.length == null)
-        info = [info]
-
-      for (i = 0; i < info.length; i++) {
-        let str = '--------ADDING TO QUEUE----------\n';
-        str = str + 'title:' + info[i].title + '\n';
-        str = str + 'filename:' + info[i]._filename + '\n';
-        str = str + '------' + requestor.username + '---' + requestor.id + '------\n'
-        log(str, message.guild.id);
-        if (message)
-          message.react("👍");
-        player.addToQueue(info[i].url, guildID, info[i]);
-      }
-      if (first && !player.inGuild(guildID))
-        voiceChannel.join().then(connection => player.playUniversal(connection, guildID));
-
-      if (urls.length > 0)
-        addURLs(urls, guildID, requestor, voiceChannel, false, false);
-
-    });
-  } else {
-    if (urls.length > 0)
-      addURLs(urls, guildID, requestor, voiceChannel, message, true);
-    else if (message)
-      message.react("👎");
-  }
-}
-
-function addNext(urls, guildID, requestor, voiceChannel, message) {
-  url = urls.pop()
-  if (validUrl.isUri(url)) {
-    youtubedl.getInfo(url, ytdlOptions, {
-      maxBuffer: 1024 * 1000
-    }, function (err, info) {
-      if (err) {
-        if (message)
-          message.react("😠");
-        console.log(err)
-        return
-      }
-      let str = '--------ADDING TO QUEUE----------\n';
-      str = str + 'title:' + info.title + '\n';
-      str = str + 'filename:' + info._filename + '\n';
-      str = str + '------' + requestor.username + '---' + requestor.id + '------\n'
-      log(str, message.guild.id);
-      if (message)
-        message.react("👍");
-      player.playNext(info.url, guildID, info);
-
-      if (urls.length > 0)
-        addNext(urls, guildID, requestor, voiceChannel, false);
-
-    });
-  } else {
-    if (urls.length > 0)
-      addNext(urls, guildID, requestor, voiceChannel, message);
-    else if (message)
-      message.react("👎");
-  }
-}
-
-
-function playVoice(message) {
-  if (player.inGuild(message.guild.id) || !message.member.voiceChannel)
-    return;
-  let name = message.content.substr(1).split(" ", 1)[0].toLowerCase();
-  voice = voices[name];
-
-  message.member.voiceChannel.join().then(connection => {
-    const file = voice[Math.floor(Math.random() * voice.length)];
-    let str = "--------PLAY VOICE---------\n";
-    str = str + 'Requestor id:' +  message.author.id + '\n';
-    str = str + 'Requestor name:' + message.author.username + '\n';
-    str = str + 'Requested Voice:' + name + '\n';
-    str = str + 'Filename:' + file + '\n';
-    str = str + '-------------------------\n';
-    log(str, message.guild.id);
-    player.playFile(file, connection, message.guild.id);
-    if ( message.deletable ) {
-        message.delete();
-    } else {
-        message.react("👍");
-    }
-  });
-}
-
-
-
-client.on('ready', () => {
-  console.log("Getting Voices...")
-  getVoices();
-  console.log('I am ready!');
-});
-
-
-//Admin Commands
-client.on('message', message => {
-  if (message.author.id != config.admin)
-    return
-
-  switch (message.content.split(' ')[0].toLowerCase()) {
-    case "/reloadvoices":
-      getVoices();
-      message.react("👍");
-      break
-    case "/twitchallow":
-      if(typeof message.content.split(' ')[1] == 'undefined'){
-        message.react("👍")
-        message.reply(twitchAdmins)
-      }else{
-        if(message.content.split(' ')[1].match(/[^0-9]/) == null){
-          twitchAdmins.push(message.content.split(' ')[1])
-          message.react("👍");
-        }else{
-          message.react("👎")
+/*
+ * Iterate through PLUGIN_DIR, require all files
+ * Add required module to Plugins[plugin_name]
+ */
+function populatePlugins() {
+    let plugins = FS.readdirSync(PLUGIN_DIR).filter( x => x.slice(-3) == '.js' );
+    let plugin_init = [];
+    plugins.forEach( plugin => {
+        let plugin_name = plugin.split('.js')[0];
+        if ( Plugins[plugin_name] ) {
+            throw new Error("Conflicting plugin names.");
         }
-      }
-      break
-    case "/twitchseed":
-      seedTwitch()
-      message.react("👎")
-      break
-    case "/twitchfollowing":
-      var reply = "";
-      var twitchFollow = twitchHandler.getSubscriptions();
-      for(var sub in twitchFollow){
-        reply = reply + "**" + (parseInt(sub) + 1) + ")**  " + twitchFollow[sub] + "\n"
-      }
-      if(reply == ""){
-        message.reply("Not following anyone.")
-      }else{
-        message.reply("**Following**\n" + reply)
-      }
-      break
-    case "/uploadallow":
-      let msg_arr = message.content.split(' ');
-      let mapping = "default";
-      if (msg_arr.length == 3)
-        mapping = msg_arr[2];
-      if (msg_arr.length > 1){
-        voiceMappings[msg_arr[1]] = mapping;
-        message.react("👍")
-      }
-    break
-    case "/twitchallowed":
-      message.reply(JSON.stringify(twitchAdmins));
-      message.react("👍")
-    break
-    case "/uploadallowed":
-      message.reply(JSON.stringify(voiceMappings));
-      message.react("👍")
-    break
-    case "/say":
-      message.reply(message.content.slice(5));
-      message.react("👍")
-      break
-    case "/setlogchannel":
-      loggingChannels[message.guild.id] = message.channel.id
-      message.react("👍")
-    case "/getlogchannel":
-      message.reply(loggingChannels[message.guild.id])
-      message.react("👍")
-    break
-    case "/admincommands":
-      message.reply("reloadVoices\ntwitchAllow\ntwitchSeed\ntwitchFollowing\nsay\nuploadallow\nuploadallowed\ntwtichallowed\ngetlogchannel\nsetlogchannel");
-    break
-
-  }
-
-
-});
-
-//Upload
-client.on('message', message => {
-  if (message.channel.type != "dm")
-    return
-  
-  if (!voiceMappings[message.author.id])
-    return
-
-  let voice_command = voiceMappings[message.author.id];
-  if ( message.content ){
-    let temp_command =  message.content.trim().replace(' ','_').replace(/[^a-zA-Z0-9_\-]/gi, '');
-    if(reserved_commands.includes(temp_command.toLowerCase())){
-      message.reply(`${temp_command} is a reserved command, try another name.`);
-      message.react("👎");
-      return
-    } else {
-      voice_command = temp_command;
-    } 
-  }
-  if (message.attachments){
-    message.attachments.forEach(file => {
-      if (formats.indexOf(file.filename.substr(-4).toLowerCase()) == -1)
-        return
-      let path = config.installLocation + "Audio/Voices/" + voice_command + "/"
-      if (!fs.existsSync(path)){
-        fs.mkdirSync(path);
-      }
-      if ( fs.existsSync(path + file.filename) ) {
-        message.reply(`That command has a file called "${file.filename}" already, please rename the file and try again.`);
-        message.react("👎");
-      } else {
-        download(file.url, {
-          directory: path,
-          filename: file.filename
-        }, function (err) {
-          if (err) {
-            console.log(err);
-            message.react("👎");
-          } else {
-            message.reply(`File "${file.filename}" added to command "/${voice_command}"`)
-            console.log(`File "${file.filename}" added to command "/${voice_command}", by "${message.author.id}":"${message.author.username}"`)
-            message.react("👍");
-            getVoices();
-          }
+        let plugin_instance = require(`${PLUGIN_DIR}${plugin}`);
+        if ( plugin_instance ) {
+            let obj = { Client, Config, Discord: Discord.Discord, MongoConnection, logAction };
+            Plugins[plugin_name] = new plugin_instance(obj);
+        }
+        plugin_init.push({
+            Name   : plugin_name,
+            Loaded : plugin_instance ? true : false
         });
-      }
-
+        // TODO:
+        // Register plugin events for messages and rich embeds etc.
+        // So plugins don't need direct access to discord ( or other platforms )
     });
-  }
+    console.table(plugin_init);
+}
 
-});
+// Iterate through plugins and populate command list
+// If command doesn't have it's own match function, match based on command name
+function populateCommands(){
 
-// Command Check
-client.on('message', message => {
+    Object.keys(Plugins).forEach( name => {
 
-  if (message.content[0] != "/")
-    return
-  var requestedCommand = message.content.substr(1).split(" ", 1)[0].toLowerCase();
-  if (requestedCommand in commands) {
+        let commands = Plugins[name].getCommands();
 
-    commands[requestedCommand](message);
+		commands.forEach( command => {
+            let type = command.type ? command.type : Discord.CONSTS.MESSAGE;
+            if ( !command_list[type] ) {
+                command_list[type] = {};
+            }
+            if ( command_list[type][command.name] ) {
+                throw `Duplicate Command: '${command.name}'`;
+            }
 
-  } else if (requestedCommand in voices) {
-
-    playVoice(message);
-    if (player.inGuild(message.guild.id) || !message.member.voiceChannel)
-      return;
-
-    message.member.voiceChannel.join().then(connection => {
-      const file = voice[Math.floor(Math.random() * voice.length)];
-      player.playFile(file, connection, message.guild.id);
-    });
-
-  }
-
-
-});
-
-client.on('messageDelete', message => {
-  if (message.id in replies)
-    replies[message.id].delete();
-});
-
-// TwitchWatcher
-
-twitchHandler.on('online', ({name, channelID, image, title, started_at, logo, game}) =>{
-  var discordChannel = client.channels.get(channelID);
-  if (typeof discordChannel == 'undefined')
-    return
-
-    var embed = new Discord.RichEmbed({
-      'footer': {
-        'text': 'Started Streaming'
-      },
-      'title': name + ' is Streaming!',
-      'thumbnail': {
-        'url': (logo ? logo : "https://i.imgur.com/Hu00P2G.png")
-      },
-      'url': 'https://twitch.tv/' + name,
-      'timestamp': new Date(started_at),
-      'fields': [{
-        'name': (title ? title : "*None*"),
-        'value': 'Playing ' + (game ? game : " Unknown")
-      }]
+            command_list[type][command.name] = {
+                exec  : command.func,
+                info  : command.info ? command.info : "",
+                match : command.match ? command.match : (msg) => {
+                    return msg.content.split(' ')[0] == `${Config.command_char}${command.name}`;
+                },
+                plugin : name,
+                hide   : command.hide ? true : false
+            };
+        });
     });
 
-  if(image){
-     embed.setImage(image);
-  }
-  console.log("[Twitch] Online - " + name + " at " + started_at)
-  discordChannel.send(embed)
-})
-
-twitchHandler.on('message', (data) => {
-  console.log(data)
-})
-client.login(config.apikey);
-
-function log( msg, guild ){
-  let n = new Date();
-  let output = `[${n.getFullYear()}-${n.getMonth()}-${n.getDate()}_${n.getHours()}:${n.getMinutes()}:${n.getSeconds()}] : ${msg}`;
-  console.log(output);
-  if ( guild && loggingChannels[guild] ){
-    output = "```\n" + output + "```\n";
-    var discordChannel = client.channels.get(loggingChannels[guild]);
-    discordChannel.send(output);
-  }
+    command_list[Discord.CONSTS.MESSAGE]['help'] = {
+        exec   : (msg) => listCommands().forEach( str => msg.reply(str)),
+        info   : "Prints this menu.",
+        match  : (msg) =>  msg.content.split(' ')[0] == `${Config.command_char}help`,
+        plugin : "Misc"
+    };
 
 }
+
+Client.on(Discord.CONSTS.MESSAGE, message => {
+    let success = false;
+    Promise.mapSeries(Object.values(command_list[Discord.CONSTS.MESSAGE]), command => {
+        if ( command.match(message) ){
+            if ( !['logger', 'react'].includes(command.plugin) ) { success = true; }
+            return command.exec(message);
+        }
+    }).catch( err => {
+        console.log("Error with commands.");
+        console.log(err);
+        success = false;
+        // message.react('👎');
+    })
+    .then(() => {
+        if ( success ) { message.react('👍'); }
+    });
+
+});
+
+function listCommands(){
+    let reply_str = ["Commands:\n"];
+    let seen_plugins = [];
+    Object.entries(command_list[Discord.CONSTS.MESSAGE]).forEach( command => {
+        let string_addition = "";
+        if (!seen_plugins.includes(command[1].plugin)) {
+            string_addition += `**----- ${command[1].plugin[0].toUpperCase() + command[1].plugin.substr(1)} -----**\n`;
+            seen_plugins.push(command[1].plugin);
+        }
+        if ( !command[1].hide ) { string_addition += `**${Config.command_char}${command[0]}** - ${command[1].info}\n`; }
+        if ( reply_str[reply_str.length - 1].length + string_addition.length > 2000 ){
+            reply_str.push(string_addition);
+        } else {
+            reply_str[reply_str.length - 1] += string_addition;
+        }
+    });
+    return reply_str;
+}
+
+function logAction({ plugin, action, data }){
+
+        let db;
+        return MongoConnection
+        .then( (client) => {
+            db = client.db(MONGO_DB);
+            return db.collection(MONGO_LOG_COL).insertOne({ plugin, action, data, created_at: Date.now() });
+        })
+        .catch( (err) => {
+            console.log("ERROR LOGGING ACTION");
+            console.log({ plugin, action, data });
+            console.log(err.message);
+        });        
+    
+}
+
+let idle = setInterval(function() {
+    if ( Client.user ) {
+       clearInterval(idle);
+       init();
+    }
+ }, 500);
